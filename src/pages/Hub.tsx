@@ -195,10 +195,10 @@ const Hub = () => {
       <div style={{ textAlign: 'center' }}>
         <Text><img src='/img/Speeduino_logo.png' width='40%' /><br /></Text>
 
-        <Text style={{ color: 'grey', fontSize: '40px' }}><i class ="fa-solid fa-gauge"></i><br /></Text>
+        <Text style={{ color: 'grey', fontSize: '40px' }}><i className="fa-solid fa-gauge"></i><br /></Text>
         <Text>Welcome to the Speeduino online tunes viewer. This site is for use by the Speeduino community to share tunes and logs to help in diagnosing problems or simply sharing data</Text>
 
-        <Text style={{ color: 'red', fontSize: '20px' }}><br /><i class ="fa-solid fa-heart"></i><br /></Text>
+        <Text style={{ color: 'red', fontSize: '20px' }}><br /><i className="fa-solid fa-heart"></i><br /></Text>
         <Text>
           This page is possible due to the amazing work by Piotr Rogowski in creating <a href="https://github.com/hyper-tuner">Hyper Tuner</a>.<br /> 
           Please consider sponsoring his work to show your support: <a href="https://github.com/sponsors/karniv00l">https://github.com/sponsors/karniv00l</a>
