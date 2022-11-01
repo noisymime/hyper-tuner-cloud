@@ -2,7 +2,10 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  generatePath,
+  useNavigate,
+} from 'react-router-dom';
 import {
   Form,
   Input,
@@ -10,10 +13,17 @@ import {
   Divider,
   Alert,
   Space,
+  List,
+  Pagination,
+  Typography,
 } from 'antd';
 import {
   UserOutlined,
   MailOutlined,
+  ArrowRightOutlined,
+  EditOutlined,
+  GlobalOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import validateMessages from './validateMessages';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,8 +36,14 @@ import {
 } from './notifications';
 import { Routes } from '../../routes';
 import { usernameRules } from '../../utils/form';
+import { formatTime } from '../../utils/time';
+import useDb from '../../hooks/useDb';
+import { aspirationMapper } from '../../utils/tune/mappers';
+import { TunesRecordFull } from '../../types/dbData';
 
 const { Item } = Form;
+
+const tunePath = (tuneId: string) => generatePath(Routes.TUNE_TUNE, { tuneId });
 
 const Profile = () => {
   const [formProfile] = Form.useForm();
@@ -38,9 +54,19 @@ const Profile = () => {
     refreshUser,
   } = useAuth();
   const navigate = useNavigate();
+  const { getUserTunes } = useDb();
   const [isVerificationSent, setIsVerificationSent] = useState(false);
   const [isSendingVerification, setIsSendingVerification] = useState(false);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [isTunesLoading, setIsTunesLoading] = useState(false);
+  const [tunesDataSource, setTunesDataSource] = useState<TunesRecordFull[]>([]);
+
+  const goToEdit = (tuneId: string) => navigate(generatePath(Routes.UPLOAD_WITH_TUNE_ID, {
+    tuneId,
+  }));
 
   const resendEmailVerification = async () => {
     setIsSendingVerification(true);
@@ -69,6 +95,27 @@ const Profile = () => {
     }
   };
 
+  const loadData = async () => {
+    setIsTunesLoading(true);
+    try {
+      const { items, totalItems } = await getUserTunes(currentUser!.id, page, pageSize);
+      setTotal(totalItems);
+      const mapped = items.map((tune) => ({
+        ...tune,
+        key: tune.tuneId,
+        year: tune.year,
+        displacement: `${tune.displacement}l`,
+        aspiration: aspirationMapper[tune.aspiration],
+        published: formatTime(tune.updated),
+      }));
+      setTunesDataSource(mapped as any);
+    } catch (error) {
+      // request cancelled
+    } finally {
+      setIsTunesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!currentUser) {
       restrictedPage();
@@ -83,73 +130,121 @@ const Profile = () => {
         navigate(Routes.LOGIN);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   return (
-    <div className="auth-container">
-      {!currentUser?.verified && (<>
-        <Divider>Email verification</Divider>
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <Alert message="Your email address is not verified!" type="error" showIcon />
-          <Button
-            type="primary"
-            style={{ width: '100%' }}
-            icon={<MailOutlined />}
-            disabled={isVerificationSent}
-            loading={isSendingVerification}
-            onClick={resendEmailVerification}
-          >
-            Resend verification
-          </Button>
-        </Space>
-      </>)}
-      <Divider>Your Profile</Divider>
-      <Space direction="vertical" style={{ width: '100%' }} size="large">
-        {(currentUser?.profile?.username?.length || 0) === 0 && <Alert message="Remember to set your username!" type="error" showIcon />}
-        <Form
-          validateMessages={validateMessages}
-          form={formProfile}
-          onFinish={onUpdateProfile}
-          fields={[
-            {
-              name: 'username',
-              value: currentUser?.profile?.username,
-            },
-            {
-              name: 'email',
-              value: currentUser?.email,
-            },
-          ]}
-        >
-          <Item
-            name="username"
-            rules={usernameRules}
-            hasFeedback
-          >
-            <Input
-              prefix={<UserOutlined />}
-              placeholder="Username"
-              autoComplete="name"
-            />
-          </Item>
-          <Item name="email">
-            <Input prefix={<MailOutlined />} placeholder="Email" disabled />
-          </Item>
-          <Item>
+    <>
+      <div className="auth-container">
+        {!currentUser?.verified && (<>
+          <Divider>Email verification</Divider>
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            <Alert message="Your email address is not verified!" type="error" showIcon />
             <Button
               type="primary"
-              htmlType="submit"
               style={{ width: '100%' }}
-              icon={<UserOutlined />}
-              loading={isProfileLoading}
+              icon={<MailOutlined />}
+              disabled={isVerificationSent}
+              loading={isSendingVerification}
+              onClick={resendEmailVerification}
             >
-              Update
+              Resend verification
             </Button>
-          </Item>
-        </Form>
-      </Space>
-    </div>
+          </Space>
+        </>)}
+        <Divider>Your Profile</Divider>
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Form
+            validateMessages={validateMessages}
+            form={formProfile}
+            onFinish={onUpdateProfile}
+            fields={[
+              {
+                name: 'username',
+                value: currentUser!.username,
+              },
+              {
+                name: 'email',
+                value: currentUser!.email,
+              },
+            ]}
+          >
+            <Item
+              name="username"
+              rules={usernameRules}
+              hasFeedback
+            >
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="Username"
+                autoComplete="name"
+              />
+            </Item>
+            <Item name="email">
+              <Input prefix={<MailOutlined />} placeholder="Email" disabled />
+            </Item>
+            <Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                style={{ width: '100%' }}
+                icon={<UserOutlined />}
+                loading={isProfileLoading}
+              >
+                Update
+              </Button>
+            </Item>
+          </Form>
+        </Space>
+      </div>
+      <div className="small-container">
+        <Divider>Your tunes</Divider>
+        <List
+          dataSource={tunesDataSource}
+          loading={isTunesLoading}
+          renderItem={(tune) => (
+            <List.Item
+              actions={[
+                tune.visibility === 'public' ? <GlobalOutlined /> : <EyeOutlined />,
+                <Button icon={<EditOutlined />} onClick={() => goToEdit(tune.tuneId)} />,
+                <Button icon={<ArrowRightOutlined />} onClick={() => navigate(tunePath(tune.tuneId))} />,
+              ]}
+            >
+              <Space direction="vertical">
+                <List.Item.Meta
+                  title={<>
+                    {tune.vehicleName} <Typography.Text code>{tune.signature}</Typography.Text>
+                  </>}
+                  description={<>
+                    {tune.engineMake}, {tune.engineCode}, {tune.displacement}, {tune.aspiration}
+                  </>}
+                />
+                <div>
+                  <Typography.Text italic>{tune.published}</Typography.Text>
+                </div>
+              </Space>
+            </List.Item>
+          )}
+          footer={
+            <div style={{ textAlign: 'right' }}>
+              <Pagination
+                style={{ marginTop: 10 }}
+                pageSize={pageSize}
+                current={page}
+                total={total}
+                onChange={(newPage, newPageSize) => {
+                  setIsTunesLoading(true);
+                  setPage(newPage);
+                  setPageSize(newPageSize);
+                }}
+              />
+            </div>
+          }
+        />
+      </div>
+    </>
   );
 };
 

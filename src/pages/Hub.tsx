@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import {
   Button,
   Grid,
@@ -13,6 +14,7 @@ import {
   CopyOutlined,
   StarOutlined,
   ArrowRightOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import {
   useCallback,
@@ -33,10 +35,13 @@ import {
   copyToClipboard,
   isClipboardSupported,
 } from '../utils/clipboard';
-import { ProfilesRecord } from '../@types/pocketbase-types';
 import { isEscape } from '../utils/keyboard/shortcuts';
-import { TunesRecordFull } from '../types/dbData';
-import { formatTime } from '../pocketbase';
+import {
+  TunesRecordFull,
+  UsersRecordFull,
+} from '../types/dbData';
+import { formatTime } from '../utils/time';
+import { useAuth } from '../contexts/AuthContext';
 
 const { useBreakpoint } = Grid;
 const { Text, Title } = Typography;
@@ -47,13 +52,17 @@ const Hub = () => {
   const { xs } = useBreakpoint();
   const { searchTunes } = useDb();
   const navigate = useNavigate();
-  const [dataSource, setDataSource] = useState<{}[]>([]); // TODO: fix this type
+  const [dataSource, setDataSource] = useState<TunesRecordFull[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const searchRef = useRef<InputRef | null>(null);
+  const { currentUser } = useAuth();
+  const goToEdit = (tuneId: string) => navigate(generatePath(Routes.UPLOAD_WITH_TUNE_ID, {
+    tuneId,
+  }));
 
   const loadData = debounce(async (searchText: string) => {
     setIsLoading(true);
@@ -64,13 +73,13 @@ const Hub = () => {
         ...tune,
         key: tune.tuneId,
         year: tune.year,
-        author: (tune['@expand'] as { userProfile: ProfilesRecord }).userProfile.username,
+        authorUsername: (tune.expand.author as unknown as UsersRecordFull).username,
         displacement: `${tune.displacement}l`,
         aspiration: aspirationMapper[tune.aspiration],
         published: formatTime(tune.updated),
         stars: 0,
       }));
-      setDataSource(mapped);
+      setDataSource(mapped as any);
     } catch (error) {
       // request cancelled
     } finally {
@@ -81,7 +90,7 @@ const Hub = () => {
   const debounceLoadData = useCallback((value: string) => {
     setSearchQuery(value);
     loadData(value);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGlobalKeyboard = useCallback((e: KeyboardEvent) => {
@@ -109,7 +118,11 @@ const Hub = () => {
         <>
           <Title level={5}>{tune.vehicleName}</Title>
           <Space direction="vertical">
-            <Text type="secondary">{tune.author}, {tune.published}</Text>
+            <Text type="secondary">
+              <Link to={generatePath(Routes.USER_ROOT, { userId: tune.author })}>
+                {tune.authorUsername}
+              </Link>, {tune.published}
+            </Text>
             <Text>{tune.engineMake}, {tune.engineCode}, {tune.displacement}, {tune.cylindersCount} cylinders, {tune.aspiration}</Text>
             <Text code>{tune.signature}</Text>
           </Space>
@@ -136,7 +149,7 @@ const Hub = () => {
       responsive: ['sm'],
     },
     {
-      title: '',
+      title: 'Displacement',
       dataIndex: 'displacement',
       key: 'displacement',
       responsive: ['sm'],
@@ -155,9 +168,14 @@ const Hub = () => {
     },
     {
       title: 'Author',
-      dataIndex: 'author',
-      key: 'author',
+      dataIndex: 'authorUsername',
+      key: 'authorUsername',
       responsive: ['sm'],
+      render: (userName: string, record: TunesRecordFull) => (
+        <Link to={generatePath(Routes.USER_ROOT, { userId: record.author })}>
+          {userName}
+        </Link>
+      ),
     },
     {
       title: 'Signature',
@@ -180,12 +198,18 @@ const Hub = () => {
     {
       dataIndex: 'tuneId',
       fixed: 'right',
-      render: (tuneId: string) => (
-        <Space>
-          {isClipboardSupported && <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(buildFullUrl([tunePath(tuneId)]))} />}
-          <Button type="primary" icon={<ArrowRightOutlined />} onClick={() => navigate(tunePath(tuneId))} />
-        </Space>
-      ),
+      render: (tuneId: string, record: TunesRecordFull) => {
+        const isOwner = currentUser?.id === record.author;
+        const size = isOwner ? 'small' : 'middle';
+
+        return (
+          <Space>
+            {isOwner && <Button size={size} icon={<EditOutlined />} onClick={() => goToEdit(tuneId)} />}
+            {isClipboardSupported && <Button size={size} icon={<CopyOutlined />} onClick={() => copyToClipboard(buildFullUrl([tunePath(tuneId)]))} />}
+            <Button size={size} type="primary" icon={<ArrowRightOutlined />} onClick={() => navigate(tunePath(tuneId))} />
+          </Space>
+        );
+      },
       key: 'tuneId',
     },
   ];
@@ -222,6 +246,7 @@ const Hub = () => {
         loading={isLoading}
         scroll={xs ? undefined : { x: 1360 }}
         pagination={false}
+        rowClassName={(tune) => tune.visibility}
       />
       <div style={{ textAlign: 'right' }}>
         <Pagination

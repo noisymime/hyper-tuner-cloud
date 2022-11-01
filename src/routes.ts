@@ -7,6 +7,7 @@ export enum Routes {
   TUNE_TAB = '/t/:tuneId/:tab',
   TUNE_TUNE = '/t/:tuneId/tune',
   TUNE_DIALOG = '/t/:tuneId/tune/:category/:dialog',
+  TUNE_GROUP_MENU_DIALOG = '/t/:tuneId/tune/:category/:groupMenu/:dialog',
   TUNE_LOGS = '/t/:tuneId/logs',
   TUNE_LOGS_FILE = '/t/:tuneId/logs/:fileName',
   TUNE_DIAGNOSE = '/t/:tuneId/diagnose',
@@ -26,6 +27,7 @@ export enum Routes {
   OAUTH_CALLBACK = '/auth/oauth-callback/:provider',
 
   ABOUT = '/about',
+  USER_ROOT = '/user/:userId',
 
   REDIRECT_PAGE_OAUTH_CALLBACK = 'oauth',
 }

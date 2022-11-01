@@ -50,7 +50,6 @@ import {
   error,
   restrictedPage,
   signatureNotSupportedWarning,
-  usernameNotSet,
 } from './auth/notifications';
 import { useAuth } from '../contexts/AuthContext';
 import { Routes } from '../routes';
@@ -211,8 +210,7 @@ const UploadPage = () => {
     const { signature } = tuneParser.parse(await tuneFile!.arrayBuffer()).getTune().details;
 
     const newData: TunesRecord = {
-      user: currentUser!.id,
-      userProfile: currentUser!.profile!.id,
+      author: currentUser!.id,
       tuneId: newTuneId!,
       signature,
       vehicleName,
@@ -265,13 +263,12 @@ const UploadPage = () => {
 
     if (existingTune) {
       // clear old multi files first
-      if (logFiles.length > 0 || toothLogFiles.length > 0) {
-        const tempFormData = new FormData();
-        tempFormData.append('logFiles', '');
-        tempFormData.append('toothLogFiles', '');
-        await updateTune(existingTune.id, tempFormData as unknown as TunesRecord);
-      }
+      const tempFormData = new FormData();
+      tempFormData.append('logFiles', '');
+      tempFormData.append('toothLogFiles', '');
+      await updateTune(existingTune.id, tempFormData as unknown as TunesRecord);
 
+      // another update with new files
       await updateTune(existingTune.id, formData as unknown as TunesRecord);
     } else {
       await createTune(formData as unknown as TunesRecord);
@@ -321,16 +318,24 @@ const UploadPage = () => {
       }
 
       const parsed = tuneParser.parse(await file.arrayBuffer());
+      const { signature } = parsed.getTune().details;
+
+      if (!parsed.isValid()) {
+        return {
+          result: false,
+          message: 'Tune file is not valid or not supported!',
+        };
+      }
 
       try {
-        await fetchINIFile(parsed.getTune().details.signature);
+        await fetchINIFile(signature);
       } catch (e) {
         signatureNotSupportedWarning((e as Error).message);
       }
 
       return {
-        result: parsed.isValid(),
-        message: 'Tune file is not valid!',
+        result: true,
+        message: '',
       };
     });
   };
@@ -434,7 +439,7 @@ const UploadPage = () => {
 
     if (oldTune) {
       // this is someone elses tune
-      if (oldTune.user !== currentUser?.id) {
+      if (oldTune.author !== currentUser?.id) {
         navigateToNewTuneId();
         return;
       }
@@ -533,13 +538,6 @@ const UploadPage = () => {
         return;
       }
 
-      if ((user.profile?.username?.length || 0) === 0) {
-        usernameNotSet();
-        navigate(Routes.PROFILE);
-
-        return;
-      }
-
       setIsUserAuthorized(true);
       prepareData();
     });
@@ -556,7 +554,7 @@ const UploadPage = () => {
     <Row style={{ marginTop: 10 }} {...rowProps}>
       <Col {...colProps}>
         <Item name="visibility">
-          <Select disabled>
+          <Select>
             <Select.Option value="public">
               <Space><GlobalOutlined />Public</Space>
             </Select.Option>
