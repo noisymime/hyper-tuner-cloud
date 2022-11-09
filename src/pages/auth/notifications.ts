@@ -42,7 +42,7 @@ const logInFailed = (err: Error) => notification.error({
   ...baseOptions,
 });
 
-const restrictedPage = () => notification.error({
+const restrictedPage = () => notification.warning({
   message: 'Restricted page',
   description: 'You have to be logged in to access this page!',
   ...baseOptions,
@@ -125,6 +125,11 @@ const iniLoadingError = (err: Error) => notification.error({
   ...baseOptions,
 });
 
+const tuneNotFound = () => notification.warning({
+  message: 'Tune not found',
+  ...baseOptions,
+});
+
 const tuneParsingError = () => notification.error({
   message: 'Tune file is not valid',
   ...baseOptions,
@@ -169,6 +174,7 @@ export {
   databaseGenericError,
   copiedToClipboard,
   iniLoadingError,
+  tuneNotFound,
   tuneParsingError,
   signatureNotSupportedWarning,
   downloading,

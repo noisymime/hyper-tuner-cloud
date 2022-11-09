@@ -19,12 +19,12 @@ import {
   Divider,
   Typography,
   Badge,
+  Grid,
 } from 'antd';
 import {
   FileTextOutlined,
   GlobalOutlined,
 } from '@ant-design/icons';
-import useBreakpoint from 'antd/lib/grid/hooks/useBreakpoint';
 import { connect } from 'react-redux';
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import Pako from 'pako';
@@ -54,7 +54,6 @@ import {
 } from '../components/Tune/SideBar';
 
 const { Content } = Layout;
-const { Step } = Steps;
 
 const edgeUnknown = 'Unknown';
 const badgeStyle = { backgroundColor: Colors.TEXT };
@@ -76,7 +75,7 @@ const Diagnose = ({
   loadedToothLogs: ToothLogsState;
   tuneData: TuneDataState | null;
 }) => {
-  const { lg } = useBreakpoint();
+  const { lg } = Grid.useBreakpoint();
   const { Sider } = Layout;
   const [progress, setProgress] = useState(0);
   const [fileSize, setFileSize] = useState<string>();
@@ -277,25 +276,29 @@ const Diagnose = ({
                   className="logs-progress"
                 />
                 <Divider />
-                <Steps current={step} direction={lg ? 'horizontal' : 'vertical'}>
-                  <Step
-                    title="Downloading"
-                    subTitle={fileSize}
-                    description={
-                      fetchError ? fetchError!.message : <Space>
-                        <GlobalOutlined />{edgeLocation}
-                      </Space>
-                    }
-                  />
-                  <Step
-                    title="Decoding"
-                    description="Parsing CSV"
-                  />
-                  <Step
-                    title="Rendering"
-                    description="Putting pixels on your screen"
-                  />
-                </Steps>
+                <Steps
+                  current={step}
+                  direction={lg ? 'horizontal' : 'vertical'}
+                  items={[
+                    {
+                      title: 'Downloading',
+                      subTitle: fileSize,
+                      description: (
+                        fetchError ? fetchError!.message : <Space>
+                          <GlobalOutlined />{edgeLocation}
+                        </Space>
+                      ),
+                    },
+                    {
+                      title: 'Decoding',
+                      description: 'Parsing CSV',
+                    },
+                    {
+                      title: 'Rendering',
+                      description: 'Putting pixels on your screen',
+                    },
+                  ]}
+                />
               </Space>
             }
           </div>

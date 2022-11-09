@@ -1,13 +1,26 @@
 {
-    "typescript.tsdk": "node_modules/typescript/lib",
-    "cSpell.words": [
-        "hypertuner",
-        "kbar",
-        "pocketbase",
-        "prefs",
-        "rusefi",
-        "typegen",
-        "vite",
-        "vitejs"
-    ]
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "editor.formatOnSave": true,
+  "cSpell.words": [
+    "hypertuner",
+    "kbar",
+    "pocketbase",
+    "prefs",
+    "rusefi",
+    "typegen",
+    "vite",
+    "vitejs"
+  ],
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[less]": {
+    "editor.defaultFormatter": "vscode.css-language-features"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  }
 }

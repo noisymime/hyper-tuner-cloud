@@ -21,14 +21,14 @@ import {
   Divider,
   Badge,
   Typography,
+  Grid,
 } from 'antd';
 import {
   FileTextOutlined,
   EditOutlined,
   GlobalOutlined,
 } from '@ant-design/icons';
-import { CheckboxValueType } from 'antd/lib/checkbox/Group';
-import useBreakpoint from 'antd/lib/grid/hooks/useBreakpoint';
+import { CheckboxValueType } from 'antd/es/checkbox/Group';
 import { connect } from 'react-redux';
 import { Result as ParserResult } from 'mlg-converter/dist/types';
 import PerfectScrollbar from 'react-perfect-scrollbar';
@@ -70,7 +70,6 @@ import {
 } from '../components/Tune/SideBar';
 
 const { Content } = Layout;
-const { Step } = Steps;
 const edgeUnknown = 'Unknown';
 const minCanvasHeightInner = 500;
 const badgeStyle = { backgroundColor: Colors.TEXT };
@@ -93,7 +92,7 @@ const Logs = ({
   loadedLogs: LogsState;
   tuneData: TuneDataState | null;
 }) => {
-  const { lg } = useBreakpoint();
+  const { lg } = Grid.useBreakpoint();
   const { Sider } = Layout;
   const [progress, setProgress] = useState(0);
   const [fileSize, setFileSize] = useState<string>();
@@ -384,29 +383,33 @@ const Logs = ({
                   className="logs-progress"
                 />
                 <Divider />
-                <Steps current={step} direction={lg ? 'horizontal' : 'vertical'}>
-                  <Step
-                    title="Downloading"
-                    subTitle={fileSize}
-                    description={
-                      fetchError ? fetchError!.message : <Space>
-                        <GlobalOutlined />{edgeLocation}
-                      </Space>
-                    }
-                    status={fetchError && 'error'}
-                  />
-                  <Step
-                    title="Decoding"
-                    description={parseError ? parseError!.message : 'Reading ones and zeros'}
-                    subTitle={parseElapsed}
-                    status={parseError && 'error'}
-                  />
-                  <Step
-                    title="Rendering"
-                    description="Putting pixels on your screen"
-                    subTitle={samplesCount && `${samplesCount} samples`}
-                  />
-                </Steps>
+                <Steps
+                  current={step}
+                  direction={lg ? 'horizontal' : 'vertical'}
+                  items={[
+                    {
+                      title: 'Downloading',
+                      subTitle: fileSize,
+                      description: (
+                        fetchError ? fetchError!.message : <Space>
+                          <GlobalOutlined />{edgeLocation}
+                        </Space>
+                      ),
+                      status: fetchError && 'error',
+                    },
+                    {
+                      title: 'Decoding',
+                      description: parseError ? parseError!.message : 'Reading ones and zeros',
+                      subTitle: parseElapsed,
+                      status: parseError && 'error',
+                    },
+                    {
+                      title: 'Rendering',
+                      description: 'Putting pixels on your screen',
+                      subTitle: samplesCount && `${samplesCount} samples`,
+                    },
+                  ]}
+                />
               </Space>
             }
           </div>

@@ -3,23 +3,38 @@ import {
   client,
   formatError,
   ClientResponseError,
+  API_URL,
 } from '../pocketbase';
-import {
-  IniFilesRecordFull,
-  TunesRecordFull,
-  TunesRecordPartial,
-} from '../types/dbData';
 import { databaseGenericError } from '../pages/auth/notifications';
 import {
   Collections,
+  IniFilesResponse,
   TunesRecord,
+  TunesResponse,
 } from '../@types/pocketbase-types';
 
+type Partial<T> = {
+  [A in keyof T]?: T[A];
+};
+
+export type TunesRecordPartial = Partial<TunesRecord>;
+
+type TunesResponseList = {
+  items: TunesResponse[];
+  totalItems: number;
+}
+
 const tunesCollection = client.collection(Collections.Tunes);
-const iniFilesCollection = client.collection(Collections.IniFiles);
+
+const customEndpoint = `${API_URL}/api/custom`;
+
+const headers = (token: string) => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`,
+});
 
 const useDb = () => {
-  const updateTune = async (id: string, data: TunesRecordPartial) => {
+  const updateTune = async (id: string, data: TunesRecordPartial): Promise<void> => {
     try {
       await tunesCollection.update(id, data);
       return Promise.resolve();
@@ -31,11 +46,11 @@ const useDb = () => {
     }
   };
 
-  const createTune = async (data: TunesRecord) => {
+  const createTune = async (data: TunesRecord): Promise<TunesResponse> => {
     try {
-      const record = await tunesCollection.create(data);
+      const record = await tunesCollection.create<TunesResponse>(data);
 
-      return Promise.resolve(record as TunesRecordFull);
+      return Promise.resolve(record);
     } catch (error) {
       Sentry.captureException(error);
       databaseGenericError(new Error(formatError(error)));
@@ -44,54 +59,41 @@ const useDb = () => {
     }
   };
 
-  const getTune = async (tuneId: string) => {
-    try {
-      const tune = await tunesCollection.getFirstListItem(
-        `tuneId = "${tuneId}"`,
-        {
-          expand: 'author',
-        },
-      );
+  const getTune = async (tuneId: string): Promise<TunesResponse | null> => {
+    const response = await fetch(`${customEndpoint}/tunes/byTuneId/${tuneId}`);
 
-      return Promise.resolve(tune as TunesRecordFull);
-    } catch (error) {
-      if ((error as ClientResponseError).isAbort) {
-        return Promise.reject(new Error('Cancelled'));
-      }
-
-      if ((error as ClientResponseError).status === 404) {
-        return Promise.resolve(null);
-      }
-
-      Sentry.captureException(error);
-      databaseGenericError(new Error(formatError(error)));
-
-      return Promise.reject(error);
+    if (response.ok) {
+      return response.json();
     }
+
+    if (response.status === 404) {
+      return Promise.resolve(null);
+    }
+
+    Sentry.captureException(response);
+    databaseGenericError(new Error(response.statusText));
+
+    return Promise.reject(response.status);
   };
 
-  const getIni = async (signature: string) => {
-    try {
-      const ini = await iniFilesCollection.getFirstListItem(`signature = "${signature}"`);
+  const getIni = async (signature: string): Promise<IniFilesResponse | null> => {
+    const response = await fetch(`${customEndpoint}/iniFiles/bySignature/${signature}`);
 
-      return Promise.resolve(ini as IniFilesRecordFull);
-    } catch (error) {
-      if ((error as ClientResponseError).isAbort) {
-        return Promise.reject(new Error('Cancelled'));
-      }
-
-      if ((error as ClientResponseError).status === 404) {
-        return Promise.resolve(null);
-      }
-
-      Sentry.captureException(error);
-      databaseGenericError(new Error(formatError(error)));
-
-      return Promise.reject(error);
+    if (response.ok) {
+      return response.json();
     }
+
+    if (response.status === 404) {
+      return Promise.resolve(null);
+    }
+
+    Sentry.captureException(response);
+    databaseGenericError(new Error(response.statusText));
+
+    return Promise.reject(response.status);
   };
 
-  const searchTunes = async (search: string, page: number, perPage: number) => {
+  const searchTunes = async (search: string, page: number, perPage: number): Promise<TunesResponseList> => {
     const phrases = search.length > 0 ? search.replace(/ +(?= )/g, '').split(' ') : [];
     const filter = phrases
       .filter((phrase) => phrase.length > 1)
@@ -99,14 +101,14 @@ const useDb = () => {
       .join(' && ');
 
     try {
-      const list = await tunesCollection.getList(page, perPage, {
-        sort: '-updated',
+      const list = await tunesCollection.getList<TunesResponse>(page, perPage, {
+        sort: '-stars,-updated',
         filter,
         expand: 'author',
       });
 
       return Promise.resolve({
-        items: list.items as TunesRecordFull[],
+        items: list.items,
         totalItems: list.totalItems,
       });
     } catch (error) {
@@ -121,16 +123,16 @@ const useDb = () => {
     }
   };
 
-  const getUserTunes = async (userId: string, page: number, perPage: number) => {
+  const getUserTunes = async (userId: string, page: number, perPage: number): Promise<TunesResponseList> => {
     try {
-      const list = await tunesCollection.getList(page, perPage, {
+      const list = await tunesCollection.getList<TunesResponse>(page, perPage, {
         sort: '-updated',
         filter: `author = "${userId}"`,
         expand: 'author',
       });
 
       return Promise.resolve({
-        items: list.items as TunesRecordFull[],
+        items: list.items,
         totalItems: list.totalItems,
       });
     } catch (error) {
@@ -145,13 +147,13 @@ const useDb = () => {
     }
   };
 
-  const autocomplete = async (attribute: string, search: string) => {
+  const autocomplete = async (attribute: string, search: string): Promise<TunesResponse[]> => {
     try {
-      const items = await tunesCollection.getFullList(10, {
+      const items = await tunesCollection.getFullList<TunesResponse>(10, {
         filter: `${attribute} ~ "${search}"`,
       });
 
-      return Promise.resolve(items as TunesRecordFull[]);
+      return Promise.resolve(items);
     } catch (error) {
       if ((error as ClientResponseError).isAbort) {
         return Promise.reject(new Error('Cancelled'));
@@ -164,14 +166,60 @@ const useDb = () => {
     }
   };
 
+  const toggleStar = async (currentUserToken: string, tune: string): Promise<{ stars: number, isStarred: boolean }> => {
+    const response = await fetch(`${customEndpoint}/stargazers/toggleStar`, {
+      method: 'POST',
+      headers: headers(currentUserToken),
+      body: JSON.stringify({ tune }),
+    });
+
+    if (response.ok) {
+      const { stars, isStarred } = await response.json();
+
+      return Promise.resolve({ stars, isStarred });
+    }
+
+    if (response.status === 404) {
+      return Promise.resolve({ stars: 0, isStarred: false });
+    }
+
+    Sentry.captureException(response);
+    databaseGenericError(new Error(response.statusText));
+
+    return Promise.reject(response.status);
+  };
+
+  const isStarredByMe = async (currentUserToken: string, tune: string): Promise<boolean> => {
+    const response = await fetch(`${customEndpoint}/stargazers/starredByMe/${tune}`, {
+      headers: headers(currentUserToken),
+    });
+
+    if (response.ok) {
+      const { isStarred } = await response.json();
+
+      return Promise.resolve(isStarred);
+    }
+
+    if (response.status === 404) {
+      return Promise.resolve(false);
+    }
+
+    Sentry.captureException(response);
+    databaseGenericError(new Error(response.statusText));
+
+    return Promise.reject(response.status);
+  };
+
   return {
-    updateTune: (tuneId: string, data: TunesRecordPartial): Promise<void> => updateTune(tuneId, data),
-    createTune: (data: TunesRecord): Promise<TunesRecordFull> => createTune(data),
-    getTune: (tuneId: string): Promise<TunesRecordFull | null> => getTune(tuneId),
-    getIni: (tuneId: string): Promise<IniFilesRecordFull | null> => getIni(tuneId),
-    searchTunes: (search: string, page: number, perPage: number): Promise<{ items: TunesRecordFull[]; totalItems: number }> => searchTunes(search, page, perPage),
-    getUserTunes: (userId: string, page: number, perPage: number): Promise<{ items: TunesRecordFull[]; totalItems: number }> => getUserTunes(userId, page, perPage),
-    autocomplete: (attribute: string, search: string): Promise<TunesRecordFull[]> => autocomplete(attribute, search),
+    updateTune,
+    createTune,
+    getTune,
+    getIni,
+    searchTunes,
+    getUserTunes,
+    autocomplete,
+    toggleStar,
+    isStarredByMe,
   };
 };
 

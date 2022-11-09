@@ -34,12 +34,12 @@ import Info from './pages/Info';
 import Hub from './pages/Hub';
 import { FormRoles } from './pages/auth/Login';
 import useServerStorage from './hooks/useServerStorage';
-import { TunesRecordFull } from './types/dbData';
 import TuneParser from './utils/tune/TuneParser';
 import standardDialogs from './data/standardDialogs';
 import help from './data/help';
 import {
   iniLoadingError,
+  tuneNotFound,
   tuneParsingError,
 } from './pages/auth/notifications';
 import { divider } from './data/constants';
@@ -51,6 +51,7 @@ import {
 import 'uplot/dist/uPlot.min.css';
 import 'react-perfect-scrollbar/dist/css/styles.css';
 import './css/App.less';
+import { TunesResponse } from './@types/pocketbase-types';
 
 const Tune = lazy(() => import('./pages/Tune'));
 const Logs = lazy(() => import('./pages/Logs'));
@@ -82,7 +83,7 @@ const App = ({ ui, tuneData }: { ui: UIState, tuneData: TuneDataState }) => {
   const tuneId = tunePathMatch?.params.tuneId;
   const { fetchINIFile, fetchTuneFile } = useServerStorage();
 
-  const loadTune = async (data: TunesRecordFull | null) => {
+  const loadTune = async (data: TunesResponse | null) => {
     if (data === null) {
       store.dispatch({ type: 'config/load', payload: null });
       store.dispatch({ type: 'tune/load', payload: null });
@@ -120,7 +121,9 @@ const App = ({ ui, tuneData }: { ui: UIState, tuneData: TuneDataState }) => {
       store.dispatch({ type: 'tune/load', payload: tune });
     } catch (error) {
       iniLoadingError((error as Error));
-      navigate(Routes.HUB);
+      navigate(generatePath(Routes.TUNE_ROOT, {
+        tuneId: tuneId!,
+      }));
     }
   };
 
@@ -149,7 +152,7 @@ const App = ({ ui, tuneData }: { ui: UIState, tuneData: TuneDataState }) => {
 
       getTune(tuneId).then(async (tune) => {
         if (!tune) {
-          console.warn('Tune not found');
+          tuneNotFound();
           navigate(Routes.HUB);
           return;
         }

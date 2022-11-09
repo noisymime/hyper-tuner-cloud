@@ -56,7 +56,7 @@ import { Routes } from '../routes';
 import TuneParser from '../utils/tune/TuneParser';
 import TriggerLogsParser from '../utils/logs/TriggerLogsParser';
 import LogValidator from '../utils/logs/LogValidator';
-import useDb from '../hooks/useDb';
+import useDb, { TunesRecordPartial } from '../hooks/useDb';
 import useServerStorage from '../hooks/useServerStorage';
 import { buildFullUrl } from '../utils/url';
 import Loader from '../components/Loader';
@@ -66,11 +66,10 @@ import {
 } from '../utils/form';
 import { aspirationMapper } from '../utils/tune/mappers';
 import { copyToClipboard } from '../utils/clipboard';
-import { TunesRecord } from '../@types/pocketbase-types';
 import {
-  TunesRecordFull,
-  TunesRecordPartial,
-} from '../types/dbData';
+  TunesRecord,
+  TunesResponse,
+} from '../@types/pocketbase-types';
 import { removeFilenameSuffix } from '../pocketbase';
 
 const { Item, useForm } = Form;
@@ -124,7 +123,7 @@ const UploadPage = () => {
   const [isPublished, setIsPublished] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [readme, setReadme] = useState(defaultReadme);
-  const [existingTune, setExistingTune] = useState<TunesRecordFull>();
+  const [existingTune, setExistingTune] = useState<TunesResponse>();
 
   const [defaultTuneFileList, setDefaultTuneFileList] = useState<UploadFile[]>([]);
   const [defaultLogFilesList, setDefaultLogFilesList] = useState<UploadFile[]>([]);
@@ -135,6 +134,8 @@ const UploadPage = () => {
   const [customIniFile, setCustomIniFile] = useState<File>();
   const [logFiles, setLogFiles] = useState<File[]>([]);
   const [toothLogFiles, setToothLogFiles] = useState<File[]>([]);
+
+  const [customIniRequired, setCustomIniRequired] = useState(false);
 
   const shareSupported = 'share' in navigator;
   const { currentUser, refreshUser } = useAuth();
@@ -151,7 +152,7 @@ const UploadPage = () => {
     }
 
     const options = (await autocomplete(attribute, search))
-      .map((record) => record[attribute]);
+      .map((record) => (record as any)[attribute]);
 
     // TODO: order by occurrence (more common - higher in the list)
     const unique = [...new Set(options)].map((value) => ({ value }));
@@ -242,7 +243,7 @@ const UploadPage = () => {
         fuel,
         ignition,
         year,
-      ].filter((field) => field !== null && `${field}`.length > 1)
+      ].filter((field) => field !== null && `${field}`.length > 1 && field !== 'null')
         .join(' ')
         .replace(/[^\w.\-\d ]/g, ''),
     };
@@ -262,7 +263,7 @@ const UploadPage = () => {
     });
 
     if (existingTune) {
-      // clear old multi files first
+      // always clear old multi files first since there is no other way to handle this
       const tempFormData = new FormData();
       tempFormData.append('logFiles', '');
       tempFormData.append('toothLogFiles', '');
@@ -330,8 +331,16 @@ const UploadPage = () => {
       try {
         await fetchINIFile(signature);
       } catch (e) {
+        setCustomIniRequired(true);
         signatureNotSupportedWarning((e as Error).message);
+
+        return {
+          result: true,
+          message: '',
+        };
       }
+
+      setCustomIniRequired(false);
 
       return {
         result: true,
@@ -410,6 +419,10 @@ const UploadPage = () => {
         validationMessage = (e as Error).message;
       }
 
+      if (valid) {
+        setCustomIniRequired(false);
+      }
+
       return {
         result: valid,
         message: validationMessage,
@@ -422,11 +435,11 @@ const UploadPage = () => {
   };
 
   const removeLogFile = async (file: UploadFile) => {
-    setLogFiles((prev) => prev.filter((f) => f.name !== file.name));
+    setLogFiles((prev) => prev.filter((f) => removeFilenameSuffix(f.name) !== file.name));
   };
 
   const removeToothLogFile = async (file: UploadFile) => {
-    setToothLogFiles((prev) => prev.filter((f) => f.name !== file.name));
+    setToothLogFiles((prev) => prev.filter((f) => removeFilenameSuffix(f.name) !== file.name));
   };
 
   const removeCustomIniFile = async (file: UploadFile) => {
@@ -453,7 +466,7 @@ const UploadPage = () => {
         setTuneFile(await fetchFile(oldTune.id, oldTune.tuneFile));
         setDefaultTuneFileList([{
           uid: oldTune.tuneFile,
-          name: oldTune.tuneFile,
+          name: removeFilenameSuffix(oldTune.tuneFile),
           status: 'done',
         }]);
       }
@@ -462,7 +475,7 @@ const UploadPage = () => {
         setCustomIniFile(await fetchFile(oldTune.id, oldTune.customIniFile));
         setDefaultCustomIniFileList([{
           uid: oldTune.customIniFile,
-          name: oldTune.customIniFile,
+          name: removeFilenameSuffix(oldTune.customIniFile),
           status: 'done',
         }]);
       }
@@ -472,7 +485,7 @@ const UploadPage = () => {
         tempLogFiles.push(await fetchFile(oldTune.id, fileName));
         setDefaultLogFilesList((prev) => [...prev, {
           uid: fileName,
-          name: fileName,
+          name: removeFilenameSuffix(fileName),
           status: 'done',
         }]);
       });
@@ -483,7 +496,7 @@ const UploadPage = () => {
         tempToothLogFiles.push(await fetchFile(oldTune.id, fileName));
         setDefaultToothLogFilesList((prev) => [...prev, {
           uid: fileName,
-          name: fileName,
+          name: removeFilenameSuffix(fileName),
           status: 'done',
         }]);
       });
@@ -550,6 +563,14 @@ const UploadPage = () => {
     </Space>
   );
 
+  const publishButtonText = () => {
+    if (customIniRequired) {
+      return 'Custom INI file required!';
+    }
+
+    return isEditMode ? 'Update' : 'Publish';
+  };
+
   const publishButton = (
     <Row style={{ marginTop: 10 }} {...rowProps}>
       <Col {...colProps}>
@@ -572,8 +593,9 @@ const UploadPage = () => {
             loading={isLoading}
             htmlType="submit"
             icon={isEditMode ? <EditOutlined /> : <CheckOutlined />}
+            disabled={customIniRequired}
           >
-            {isEditMode ? 'Update' : 'Publish'}
+            {publishButtonText()}
           </Button>
         </Item>
       </Col>
